@@ -38,7 +38,7 @@
   prefix: macro-
   constructor: macro-make-persistent-vector
   id: 0a731ff2-dfd8-4869-927f-4b6bfc49d19b
-  predicate: pv?
+  predicate: macro-persistent-vector?
   macros:
   (length read-only: unprintable:)
   (lbf read-only: unprintable:)
@@ -247,7 +247,7 @@
 ;; external interface
 
 ;; test
-(define (persistent-vector? pv) (pv? pv))
+(define (persistent-vector? pv) (macro-persistent-vector? pv))
   
 ;; creation
 (define (make-persistent-vector size #!key (lbf 5) (init 0))
@@ -263,13 +263,13 @@
 
 ;; length
 (define (persistent-vector-length pv) 
-  (if (not (pv? pv)) (type-error persistent-vector-length (list pv) 0)
+  (if (not (macro-persistent-vector? pv)) (type-error persistent-vector-length (list pv) 0)
       (macro-persistent-vector-length pv)))
 
 ;; get
 (define (persistent-vector-ref pv j)
   (cond
-   ((not (pv? pv)) (type-error persistent-vector-ref (list pv j) 0))
+   ((not (macro-persistent-vector? pv)) (type-error persistent-vector-ref (list pv j) 0))
    ((not (integer? j)) (type-error persistent-vector-ref (list pv j) 1))
    ((< j 0) (range-error persistent-vector-ref (list pv j) 1))
    ((>= j (length pv)) (range-error persistent-vector-ref (list pv j) 1))
@@ -278,7 +278,7 @@
 ;; set
 (define (persistent-vector-set pv j v)
   (cond
-   ((not (pv? pv)) (type-error persistent-vector-set (list pv j v) 0))
+   ((not (macro-persistent-vector? pv)) (type-error persistent-vector-set (list pv j v) 0))
    ((not (integer? j)) (type-error persistent-vector-set (list pv j v) 1))
    ((<= j 0) (range-error persistent-vector-set (list pv j v) 1))
    ((>= j (macro-persistent-vector-length pv)) (range-error persistent-vector-set (list pv j v) 1))
@@ -288,8 +288,8 @@
 (define (persistent-vector-map fn v . vs)
   (cond
    ((not (procedure? fn)) (type-error persistent-vector-map `(,fn ,v ,@vs) 0))
-   ((not (pv? v)) (type-error persistent-vector-map `(,fn ,v ,@vs) 1))
-   ((some? (lambda (v0) (not (pv? v0))) vs) => (lambda (j) (type-error persistent-vector-map `(,fn ,v ,@vs) (+ 2 j))))
+   ((not (macro-persistent-vector? v)) (type-error persistent-vector-map `(,fn ,v ,@vs) 1))
+   ((some? (lambda (v0) (not (macro-persistent-vector? v0))) vs) => (lambda (j) (type-error persistent-vector-map `(,fn ,v ,@vs) (+ 2 j))))
    ((some? (lambda (v0) (not (= (macro-persistent-vector-length v)  (macro-persistent-vector-length v0)))) vs) => 
     (lambda (j) (range-error persistent-vector-map `(,fn ,v ,@vs) (+ 2 j))))
    ((some? (lambda (v0) (not (= (macro-persistent-vector-lbf v) (macro-persistent-vector-lbf v0)))) vs) (slow-map fn v vs))
@@ -299,17 +299,17 @@
 (define (persistent-vector-for-each fn v)
   (cond
    ((not (procedure? fn)) (type-error persistent-vector-for-each `(,fn ,v) 0))
-   ((not (pv? v)) (type-error persistent-vector-for-each `(,fn ,v) 1))
+   ((not (macro-persistent-vector? v)) (type-error persistent-vector-for-each `(,fn ,v) 1))
    (else (unsafe-for-each fn v))))
 
 ;; push 
 (define (persistent-vector-push pv v)
-  (if (not (pv? pv)) (type-error persistent-vector-push (list pv v) 0)
+  (if (not (macro-persistent-vector? pv)) (type-error persistent-vector-push (list pv v) 0)
       (persistent-vector-push pv v)))
 
 ;; reduce
 (define (persistent-vector-reduce fn i pv)
-  (if (not (pv? pv)) (type-error persistent-vector-reduce (list fn i pv) 2)
+  (if (not (macro-persistent-vector? pv)) (type-error persistent-vector-reduce (list fn i pv) 2)
       (unsafe-reduce fn i pv)))
 
 ;; conversion
