@@ -348,15 +348,19 @@
 (define (string->persistent-vector pv)
   (list->persistent-vector (string->list pv)))
 
-;; (define *top* (expt 2 20))
+;; (define *top* 323232)
 ;; (define *pv* (time (make-persistent-vector *top* init: (lambda (x) x))))
 
 ;; (pp *top*)
-;; (pp (time (persistent-vector-reduce + 0 *pv*)))
+;; (define total (time (persistent-vector-reduce + 0 *pv*)))
 
 ;; (pp (time (do ((j 0 (+ j 1))
 ;; 	       (c 0 (+ c j)))
 ;; 	      ((>= j *top*) c))))
+
+;; (set! *pv* (persistent-vector-push *pv* (- total)))
+
+;; (pp (time (persistent-vector-reduce + 0 *pv*)))
 
 ;; (display "")
      
