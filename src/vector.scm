@@ -22,8 +22,11 @@
   (arguments read-only: unprintable:)
   (arg-num read-only: unprintable:))
 
-(define-persistent-vector-exception persistent-vector-range-exception)
-(define-persistent-vector-exception persistent-vector-type-exception)
+(define-persistent-vector-exception persistent-vector-range-exception
+  id: e1df09e4-57fa-4fda-8a62-7335e8994276)
+
+(define-persistent-vector-exception persistent-vector-type-exception
+  id: 6f03074f-f8f1-4cf8-81e6-619a788bcf2b)
 
 (define (range-error p a n)
   (raise (make-persistent-vector-range-exception p a n)))
@@ -31,10 +34,9 @@
 (define (type-error p a n)
   (raise (make-persistent-vector-type-exception p a n)))
 
-
 (define-type persistent-vector 
   prefix: macro-
-  constructor: make
+  constructor: macro-make-persistent-vector
   id: 0a731ff2-dfd8-4869-927f-4b6bfc49d19b
   predicate: pv?
   macros:
@@ -42,67 +44,49 @@
   (lbf read-only: unprintable:)
   (tree read-only: unprintable:))
 
-(define-macro (length pv) `(macro-persistent-vector-length ,pv))
-
-(define-macro (lbf pv) `(macro-persistent-vector-lbf ,pv))
-
-(define-macro (tree pv) `(macro-persistent-vector-tree ,pv))
-
-(define-macro (top pv)
-  `(max 0 (- (length ,pv) 1)))
-
-
-(define-macro (bf pv) `(arithmetic-shift 1 (lbf ,pv)))
-
-(define-macro (mask pv) `(- (bf ,pv) 1))
+(define-macro (macro-persistent-vector-bf pv) `(arithmetic-shift 1 (macro-persistent-vector-lbf ,pv)))
 
 (define (k pv)
-  (let((lbf (lbf pv)))
+  (let((lbf (macro-persistent-vector-lbf pv)))
     (lambda (j d)
       (extract-bit-field lbf (* d lbf) j))))
 
 (define (r pv)
-  (let((lbf (lbf pv)))
+  (let((lbf (macro-persistent-vector-lbf pv)))
     (lambda (j d)
       (extract-bit-field (* d lbf) 0 j))))
 
-;; (define (depth pv)
-;;   (let*((mx (top pv))
-;; 	(bit-len (integer-length mx))
-;; 	(lbf (lbf pv)))
-;;     (quotient bit-len lbf)))
-
-(define (depth pv)
-  (quotient (integer-length (- (length pv) 1))
-	    (lbf pv)))
+(define (macro-persistent-vector-depth pv)
+  (quotient (integer-length (- (macro-persistent-vector-length pv) 1))
+	    (macro-persistent-vector-lbf pv)))
 
 
 ;; (define (vector-for pv j)
 ;;   (let((k (k pv))
 ;;        (r (r pv)))
-;;     (do ((d (depth pv) (- d 1))
+;;     (do ((d (macro-persistent-vector-depth pv) (- d 1))
 ;; 	 (j j (r j d))
-;; 	 (t (tree pv) (vector-ref t (k j d))))
+;; 	 (t (macro-persistent-vector-tree pv) (vector-ref t (k j d))))
 ;; 	((<= d 0) t))))
 
 (define (vector-for pv j)
   (let((k (k pv))
        (r (r pv)))
-    (let vector-for ((d (depth pv))
+    (let vector-for ((d (macro-persistent-vector-depth pv))
 		     (j j)
-		     (t (tree pv)))
+		     (t (macro-persistent-vector-tree pv)))
       (if (<= d 0) t
 	  (vector-for (- d 1) 
 		      (r j d)
 		      (vector-ref t (k j d)))))))
 
 (define (initialize pv init)
-  (make (length pv)
-    (lbf pv) 
-    (make-tree pv init)))
+  (macro-make-persistent-vector (macro-persistent-vector-length pv)
+				(macro-persistent-vector-lbf pv) 
+				(make-tree pv init)))
 
 (define (unsafe-make size lbf init)
-  (initialize (make size lbf #f) 
+  (initialize (macro-make-persistent-vector size lbf #f) 
 	      (if (procedure? init) init (lambda (j) init))))
 
 (define (make-vector&init size init)
@@ -114,9 +98,9 @@
 (define (make-tree pv init)
   (let((k (k pv))
        (r (r pv))
-       (lbf (lbf pv)))
-    (let make-tree ((d (depth pv))
-		    (l (length pv))
+       (lbf (macro-persistent-vector-lbf pv)))
+    (let make-tree ((d (macro-persistent-vector-depth pv))
+		    (l (macro-persistent-vector-length pv))
 		    (offset 0))
       (if (<= d 0) (make-vector&init l (lambda (j) (init (+ j offset))))
 	  (let*((m (- l 1))
@@ -130,7 +114,7 @@
 				    (+ offset (* j s0))))))))))
 
 (define (unsafe-ref pv j)
-  (vector-ref (vector-for pv j) (bitwise-and j (mask pv))))
+  (vector-ref (vector-for pv j) (bitwise-and j (- (macro-persistent-vector-bf ,pv) 1))))
 
 (define (vector-set t j v)
   (let((copy (vector-copy t)))
@@ -140,21 +124,21 @@
 (define (tree-set pv j v)
   (let((k (k pv))
        (r (r pv)))
-    (let set ((d (depth pv))
+    (let set ((d (macro-persistent-vector-depth pv))
 	      (j j)
-	      (t (tree pv)))
+	      (t (macro-persistent-vector-tree pv)))
       (let((k0 (k j d))
 	   (r0 (r j d)))
 	(if (<= d 0) (vector-set t k0 v)
 	    (vector-set t k0 (set (- d 1) r0 (vector-ref t k0))))))))
 
 (define (unsafe-set pv j v)
-  (make (length pv) (lbf pv) (tree-set pv j v)))
+  (macro-make-persistent-vector (macro-persistent-vector-length pv) (macro-persistent-vector-lbf pv) (tree-set pv j v)))
 
 (define (slow-map fn v vs)
   (make-persistent-vector 
-   (length v) 
-   lbf: (lbf v) 
+   (macro-persistent-vector-length v) 
+   lbf: (macro-persistent-vector-lbf v) 
    init: (lambda (j)
 	   (apply fn (cons (unsafe-ref v j) (map (lambda (v) (unsafe-ref v j)) 
 						 vs))))))
@@ -168,19 +152,22 @@
 
 (define (fast-map fn v vs)
   (make-persistent-vector 
-   (length v)
-   lbf: (lbf v)
-   init: (tree-map (depth v) fn (tree v) (map (lambda (v) (tree v)) vs))))
+   (macro-persistent-vector-length v)
+   lbf: (macro-persistent-vector-lbf v)
+   init: (tree-map (macro-persistent-vector-depth v)
+		   fn 
+		   (macro-persistent-vector-tree v) 
+		   (map (lambda (v) (macro-persistent-vector-tree v)) vs))))
 
 
 (define (unsafe-for-each fn pv)
   (tree-for-each fn pv))
 
 (define (tree-for-each fn pv)
-  (let((bf (bf pv)))
-    (let for-each ((d (depth pv))
+  (let((bf (macro-persistent-vector-bf pv)))
+    (let for-each ((d (macro-persistent-vector-depth pv))
 		   (offset 0)
-		   (t (tree pv)))
+		   (t (macro-persistent-vector-tree pv)))
       (if (= d 0)
 	  (vector-for-each (lambda (j v) (fn (+ j offset) (vector-ref t j))) t)
 	  (vector-for-each (lambda (j v) (for-each (- d 1) (+ offset (* j bf d)) (vector-ref t j))) t)))))
@@ -191,23 +178,23 @@
     (fn j (vector-ref v j))))
 
 (define (unsafe-push pv v)
-  (make (+ 1 (length pv)) 
-    (lbf pv) 
-    (or (tree-push pv v) (tree-slidedown pv v))))
+  (macro-make-persistent-vector (+ 1 (macro-persistent-vector-length pv)) 
+				(macro-persistent-vector-lbf pv) 
+				(or (tree-push pv v) (tree-slidedown pv v))))
 
 
 (define (tree-slidedown pv v)
-  (vector (tree pv) (tree-list (depth pv) v)))
+  (vector (macro-persistent-vector-tree pv) (tree-list (macro-persistent-vector-depth pv) v)))
 
 (define (tree-list d v)
   (if (<= d 1) (vector v)
       (vector (tree-list (- d 1) v))))
 
 (define (tree-push pv v)
-  (let((lbf (lbf pv))
-       (bf (bf pv)))
-    (let push ((d (depth pv))
-	       (t (tree pv)))
+  (let((lbf (macro-persistent-vector-lbf pv))
+       (bf (macro-persistent-vector-bf pv)))
+    (let push ((d (macro-persistent-vector-depth pv))
+	       (t (macro-persistent-vector-tree pv)))
       (let((l (vector-length t)))
 	(cond
 	 ;; we are in a leaf but can't push
@@ -240,6 +227,23 @@
      ((t? (car vs)) j)
      (else (some (cdr vs) (+ j 1))))))
 
+(define (vector-reduce fn i t)
+  (do ((j 0 (+ j 1))
+       (i i (fn i (vector-ref t j))))
+      ((>= j (vector-length t)) i)))
+
+(define (tree-reduce fn i pv)
+  (let tree-reduce ((i i)
+		    (t (macro-persistent-vector-tree pv)) 
+		    (d (macro-persistent-vector-depth pv)))
+    (if (= d 0)
+	(vector-reduce fn i t)
+	(vector-reduce (lambda (i child) (tree-reduce i child (- d 1))) i t))))
+
+(define (unsafe-reduce fn i pv)
+  (tree-reduce fn i pv))
+
+
 ;; external interface
 
 ;; test
@@ -260,7 +264,7 @@
 ;; length
 (define (persistent-vector-length pv) 
   (if (not (pv? pv)) (type-error persistent-vector-length (list pv) 0)
-      (length pv)))
+      (macro-persistent-vector-length pv)))
 
 ;; get
 (define (persistent-vector-ref pv j)
@@ -277,7 +281,7 @@
    ((not (pv? pv)) (type-error persistent-vector-set (list pv j v) 0))
    ((not (integer? j)) (type-error persistent-vector-set (list pv j v) 1))
    ((<= j 0) (range-error persistent-vector-set (list pv j v) 1))
-   ((>= j (length pv)) (range-error persistent-vector-set (list pv j v) 1))
+   ((>= j (macro-persistent-vector-length pv)) (range-error persistent-vector-set (list pv j v) 1))
    (else (unsafe-set pv j v))))
 
 ;; map
@@ -286,8 +290,9 @@
    ((not (procedure? fn)) (type-error persistent-vector-map `(,fn ,v ,@vs) 0))
    ((not (pv? v)) (type-error persistent-vector-map `(,fn ,v ,@vs) 1))
    ((some? (lambda (v0) (not (pv? v0))) vs) => (lambda (j) (type-error persistent-vector-map `(,fn ,v ,@vs) (+ 2 j))))
-   ((some? (lambda (v0) (not (= (length v) (length v0)))) vs) => (lambda (j) (range-error persistent-vector-map `(,fn ,v ,@vs) (+ 2 j))))
-   ((some? (lambda (v0) (not (= (lbf v) (lbf v0)))) vs) (slow-map fn v vs))
+   ((some? (lambda (v0) (not (= (macro-persistent-vector-length v)  (macro-persistent-vector-length v0)))) vs) => 
+    (lambda (j) (range-error persistent-vector-map `(,fn ,v ,@vs) (+ 2 j))))
+   ((some? (lambda (v0) (not (= (macro-persistent-vector-lbf v) (macro-persistent-vector-lbf v0)))) vs) (slow-map fn v vs))
    (else (fast-map fn v vs))))
 
 ;; for-each 
@@ -302,6 +307,11 @@
   (if (not (pv? pv)) (type-error persistent-vector-push (list pv v) 0)
       (persistent-vector-push pv v)))
 
+;; reduce
+(define (persistent-vector-reduce fn i pv)
+  (if (not (pv? pv)) (type-error persistent-vector-reduce (list fn i pv) 2)
+      (unsafe-reduce fn i pv)))
+
 ;; conversion
 (define (vector->persistent-vector v #!key (lbf 5))
   (make-persistent-vector 
@@ -310,7 +320,7 @@
    init: (lambda (j) (vector-ref v j))))
 
 (define (persistent-vector->vector pv)
-  (apply vector-append (reverse (tree->reverse-vector-list (depth pv) (tree pv) '()))))
+  (apply vector-append (reverse (tree->reverse-vector-list (macro-persistent-vector-depth pv) (macro-persistent-vector-tree pv) '()))))
 
 (define (list->persistent-vector l)
   (vector->persistent-vector (list->vector l)))
@@ -318,3 +328,21 @@
 (define (persistent-vector->list pv)
   (vector->list (persistent-vector->vector pv)))
 
+(define (persistent-vector->string pv)
+  (list->string (persistent-vector->list pv)))
+
+(define (string->persistent-vector pv)
+  (list->persistent-vector (string->list pv)))
+
+;; (define *top* (expt 2 20))
+;; (define *pv* (time (make-persistent-vector *top* init: (lambda (x) x))))
+
+;; (pp *top*)
+;; (pp (time (persistent-vector-reduce + 0 *pv*)))
+
+;; (pp (time (do ((j 0 (+ j 1))
+;; 	       (c 0 (+ c j)))
+;; 	      ((>= j *top*) c))))
+
+;; (display "")
+     

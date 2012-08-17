@@ -21,4 +21,7 @@
   
   persistent-vector->list
   list->persistent-vector
+  
+  persistent-vector->string
+  string->persistent-vector
   ))
