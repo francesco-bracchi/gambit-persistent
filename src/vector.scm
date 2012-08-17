@@ -219,11 +219,11 @@
 
 	 ;; we are in a node, so try to push in the rightmost branch
 	 ((push (- d 1) (vector-ref t (- l 1))) =>
-	  (lambda (r) (make-vector&init l (lambda (j) (if (< j (- 1 l)) (vector-ref t j) r)))))
+	  (lambda (r) (make-vector&init l (lambda (j) (if (< j (- l 1)) (vector-ref t j) r)))))
 	 
 	 ;; we are in a node, pushing downwards failed, if we have enough rooms we can create a new branch
 	 ((< l bf)
-	  (make-vector&init (+ 1 l) (lambda (j) (if < j l) (vector-ref t j) (tree-list d v))))
+	  (make-vector&init (+ 1 l) (lambda (j)  (if (< j l) (vector-ref t j) (tree-list d v)))))
 
 	 ;; otherwise fail
 	 (else #f))))))
@@ -319,7 +319,7 @@
 ;; push 
 (define (persistent-vector-push pv v)
   (if (not (macro-persistent-vector? pv)) (type-error persistent-vector-push (list pv v) 0)
-      (persistent-vector-push pv v)))
+      (unsafe-push pv v)))
 
 ;; reduce
 (define (persistent-vector-reduce fn i pv)
