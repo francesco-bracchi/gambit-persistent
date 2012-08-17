@@ -42,9 +42,14 @@
   macros:
   (length read-only: unprintable:)
   (lbf read-only: unprintable:)
-  (tree read-only: unprintable:))
+  (tree read-only: unprintable:)
+  ;cache
+  
+  (depth read-only: unprintable:)
+  (bf read-only: unprintable:))
 
-(define-macro (macro-persistent-vector-bf pv) `(arithmetic-shift 1 (macro-persistent-vector-lbf ,pv)))
+
+(define-macro (macro-calc-persistent-vector-bf pv) `(arithmetic-shift 1 (macro-persistent-vector-lbf ,pv)))
 
 (define (k pv)
   (let((lbf (macro-persistent-vector-lbf pv)))
@@ -56,7 +61,7 @@
     (lambda (j d)
       (extract-bit-field (* d lbf) 0 j))))
 
-(define (macro-persistent-vector-depth pv)
+(define (macro-calc-persistent-vector-depth pv)
   (quotient (integer-length (- (macro-persistent-vector-length pv) 1))
 	    (macro-persistent-vector-lbf pv)))
 
@@ -83,11 +88,12 @@
 (define (initialize pv init)
   (macro-make-persistent-vector (macro-persistent-vector-length pv)
 				(macro-persistent-vector-lbf pv) 
-				(make-tree pv init)))
+				(make-tree pv init)
+				(macro-calc-persistent-vector-depth pv)
+				(macro-calc-persistent-vector-bf pv)))
 
 (define (unsafe-make size lbf init)
-  (initialize (macro-make-persistent-vector size lbf #f) 
-	      (if (procedure? init) init (lambda (j) init))))
+  (initialize (macro-make-persistent-vector size lbf #f #f #f) init))
 
 (define (make-vector&init size init)
   (do ((v (make-vector size))
@@ -99,7 +105,7 @@
   (let((k (k pv))
        (r (r pv))
        (lbf (macro-persistent-vector-lbf pv)))
-    (let make-tree ((d (macro-persistent-vector-depth pv))
+    (let make-tree ((d (macro-calc-persistent-vector-depth pv))
 		    (l (macro-persistent-vector-length pv))
 		    (offset 0))
       (if (<= d 0) (make-vector&init l (lambda (j) (init (+ j offset))))
@@ -133,7 +139,11 @@
 	    (vector-set t k0 (set (- d 1) r0 (vector-ref t k0))))))))
 
 (define (unsafe-set pv j v)
-  (macro-make-persistent-vector (macro-persistent-vector-length pv) (macro-persistent-vector-lbf pv) (tree-set pv j v)))
+  (macro-make-persistent-vector (macro-persistent-vector-length pv)
+				(macro-persistent-vector-lbf pv)
+				(tree-set pv j v)
+				(macro-persistent-vector-depth pv)
+				(macro-persistent-vector-bf pv)))
 
 (define (slow-map fn v vs)
   (make-persistent-vector 
@@ -178,9 +188,13 @@
     (fn j (vector-ref v j))))
 
 (define (unsafe-push pv v)
-  (macro-make-persistent-vector (+ 1 (macro-persistent-vector-length pv)) 
-				(macro-persistent-vector-lbf pv) 
-				(or (tree-push pv v) (tree-slidedown pv v))))
+  (let((len (macro-persistent-vector-length pv))
+       (lbf (macro-persistent-vector-lbf pv)))
+    (macro-make-persistent-vector (+ 1 len)
+				  lbf
+				  (or (tree-push pv v) (tree-slidedown pv v))
+				  (quotient (integer-length len) lbf)
+				  (macro-persistent-vector-bf pv))))
 
 
 (define (tree-slidedown pv v)
