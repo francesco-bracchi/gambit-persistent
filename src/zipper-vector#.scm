@@ -1,5 +1,5 @@
 (##namespace 
- ("persistent.vector#"
+ ("persistent.vector.zipper#"
   ;; creators
   persistent-vector
   make-persistent-vector
