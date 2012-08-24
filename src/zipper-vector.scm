@@ -14,16 +14,16 @@
 
 (define-type persistent-vector-exception
   extender: define-persistent-vector-exception
-  id: 5c88ff96-b623-48d5-b313-5a5ceddb974c
+  id: a88e7834-62d0-4015-8ddb-a508b33de6bf
   (procedure read-only: unprintable:)
   (arguments read-only: unprintable:)
   (arg-num read-only: unprintable:))
 
 (define-persistent-vector-exception persistent-vector-range-exception
-  id: e1df09e4-57fa-4fda-8a62-7335e8994276)
+  id: 1fa8bfc0-86d2-4e07-bbf7-66a6bbffa005)
 
 (define-persistent-vector-exception persistent-vector-type-exception
-  id: 6f03074f-f8f1-4cf8-81e6-619a788bcf2b)
+  id: 061b558d-a2a3-4f86-bb5e-89b8e487fb33)
 
 (define (range-error p a n)
   (raise (make-persistent-vector-range-exception p a n)))
