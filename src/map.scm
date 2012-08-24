@@ -66,7 +66,7 @@
       (cond
        ((vector? n) (node-set depth n))
        ((pair? n) (leave-set depth n))
-       (else (cons #t (cons k v)))))
+       (else (cons 1 (cons k v)))))
     
     (define (node-set depth n)
       (let ((h0 (extract-bit-field lbf (* depth lbf) hash))
@@ -84,7 +84,7 @@
 	
 	(do ((j 1 (+ j 1))
 	     (j-1 0 j))
-	    ((> j-1 lbf) (cons #t n1))
+	    ((> j-1 lbf) (cons 1 n1))
 	  (if (bit-set? j-1 bitmap) 
 	      (let((i (bit-count (extract-bit-field j 0 bitmap)))
 		   (i1 (bit-count (extract-bit-field j 0 bitmap1))))
@@ -94,14 +94,14 @@
       (let*((n1 (vector-copy n))
 	    (p (+ h0 1))
 	    (res (path-set (+ depth 1) (vector-ref n p)))
-	    (more? (car res))
+	    (delta (car res))
 	    (c (cdr res)))
 	(vector-set! n1 p c)
-	(cons more? n1)))
+	(cons delta n1)))
 	   
     (define (leave-set depth n)
       (let((k0 (car n)))
-	(if (eq k0 k) (cons #f (cons k v))
+	(if (eq k0 k) (cons 0 (cons k v))
 	    (let*((hash0 (make-hash k0))
 		  (h0 (extract-bit-field lbf (* depth lbf) hash0)))
 	      (node-set depth (vector (arithmetic-shift 1 h0) n))))))
@@ -165,16 +165,14 @@
 
 (define (unsafe-set pm k v)
   (let*((res (tree-set pm k v))
-	(more? (car res))
+	(delta (car res))
 	(tree (cdr res)))  
     (macro-make-persistent-map
      (macro-persistent-map-lbf pm)
      (macro-persistent-map-hash pm)
      (macro-persistent-map-eq pm)
      tree
-     (if more? 
-	 (+ 1 (macro-persistent-map-length pm))
-	 (macro-persistent-map-length pm)))))
+     (+ delta (macro-persistent-map-length pm)))))
   
 (define (unsafe-ref pm k d)
   (tree-ref pm k d))
@@ -247,8 +245,9 @@
 
 (define pm5 (persistent-map-set pm4 4 'quattro))
 
-(define pm6 (persistent-map-set pm5 k: 'ducento))
+(define pm6 (persistent-map-set pm5 k: 'duecento))
 
+(pp pm6)
 (pp (time (persistent-map-ref pm6 1)))
 
 ;; (persistent-map-for-each (lambda (key value) (pp (list key: key value: value))) pm6)
