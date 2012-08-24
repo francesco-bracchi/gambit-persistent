@@ -109,6 +109,39 @@
     ;; main 
     (path-set 0 (macro-persistent-map-tree pm))))
 
+(define (tree-unset pm k)
+  (let*((make-hash (macro-persistent-map-hash pm))
+	(eq (macro-persistent-map-eq pm))
+	(lbf (macro-persistent-map-lbf pm))
+	(-lbf (- lbf))
+	(hash (make-hash k))	
+	(bf (arithmetic-shift lbf 1)))
+    
+    (define (path-unset depth n)
+      (cond
+       ((vector? n) (node-unset depth n))
+       ((pair? n) (leave-unset depth n))
+       (else (cons 0 n))))
+    
+    (define (node-unset depth n)
+      (let ((h0 (extract-bit-field lbf (* depth lbf) hash))
+	    (bitmap (vector-ref n 0)))
+	(if (bit-set? h0 bitmap)
+	    (node-unset-deeper depth n bitmap h0)
+	    (cons 0 n))))
+    
+    (define (node-unset-deeper pdeth n bitmap h0)
+      (let*((res (path-set (+ depth 1) (vector-ref n p)))
+	    (delta (car res))
+	    (child (cdr res)))
+	(cond
+	 ((= delta 0) n)
+	 ((not child) #f #;" if (only 2 elements, remove that one and return (cons k0 v0)" )
+	 (else #f #;(copy the vector (with 1 less element) and copy data from n except the one @p)))))
+	 
+    ;; main 
+    (path-unset 0 (macro-persistent-map-tree pm))))
+
 (define (tree-ref pm k d)
   (let*((make-hash (macro-persistent-map-hash pm))
 	(eq (macro-persistent-map-eq pm))
@@ -163,8 +196,8 @@
    ((pair? n) (fn (car n) (cdr n)))))
 
 
-(define (unsafe-set pm k v)
-  (let*((res (tree-set pm k v))
+(define (unsafe-set pm k #!optional (v *absent*))
+  (let*((res (if (eq? v *absent*) (tree-unset pm k) (tree-set pm k v)))
 	(delta (car res))
 	(tree (cdr res)))  
     (macro-make-persistent-map
