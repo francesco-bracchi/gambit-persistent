@@ -253,7 +253,6 @@
 (define (unsafe-merge-fast p q)
   (error "fast merging not implemented, yet"))
 
-
 (define (make-persistent-map #!key (eq eq?) (hash eq?-hash) (lbf 5))
   (cond
    ((not (procedure? eq)) (type-error make-persistent-map (list eq: eq) 2))
@@ -322,35 +321,3 @@
    ((not (procedure? hash)) (type-error make-persistent-map (list hash: hash) 2))
    ((not (integer? lbf)) (type-error make-persistent-map (list lbf: lbf) 2))
    (else (unsafe-list->persistent-map ps eq hash lbf))))
-
-
-(define pm)
-
-(set! pm (make-persistent-map lbf: 2))
-(set! pm (persistent-map-set pm 0 'zero))
-(set! pm (persistent-map-set pm 1 'uno))
-(set! pm (persistent-map-set pm 'a "a"))
-(set! pm (persistent-map-set pm a: "a k"))
-(set! pm (persistent-map-set pm b: "b keyword"))
-(set! pm (persistent-map-set pm c: "c keyword"))
-(set! pm (persistent-map-set pm d: "d keyword"))
-
-;; (pp (persistent-map-reduce (lambda (a b) (cons b a)) '() pm))
-;; (persistent-map-for-each (lambda (key val) (pp `(key: ,key val: ,val))) pm)
-
-(pp (persistent-map->list pm))
-(set! pm (persistent-map-set pm 0))
-(pp (persistent-map->list pm))
-
-;; (pp (persistent-map-ref pm a:))
-;; (pp (persistent-map-ref pm 0 'missed))
- 
- ;; (define pm3 (persistent-map-set pm2 2 'due))
-
-;; (define pm4 (persistent-map-set pm3 3 'tre))
-
-;; (define pm5 (persistent-map-set pm4 4 'quattro))
-
-;; (define pm6 (persistent-map-set pm5 k: 'duecento))
-
-;; (define pm7 (persistent-map-set pm6 1))
