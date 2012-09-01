@@ -44,185 +44,222 @@
   (lbf read-only: unprintable:)
   (hash read-only: unprintable:)
   (eq read-only: unprintable:)
-  (tree read-only:)
   (length read-only:)
+;;   (tree read-only:)
+  (tree read-only: unprintable:)
   ;cache
+;;  (bf read-only: unprintable)
 )
+
+(define-type node 
+  prefix: macro-
+  constructor: macro-make-node
+  predicate: macro-node?
+  macros:
+  (bitmap read-only:)
+  (vector read-only:))
+
+(define (make-vector&init size init)
+  (do ((v (make-vector size))
+       (j 0 (+ j 1)))
+      ((>= j size) v)
+    (vector-set! v j (init j))))
 
 (define *absent* (list 'absent))
 
-(define-macro (bit-set j n)
+(define-macro (macro-bit-set j n)
   `(bitwise-ior ,n (arithmetic-shift 1 ,j)))
 
-(define (tree-set pm k v)
+(define-macro (macro-bit-unset j n)
+  `(clear-bit-field 1 ,j ,n))
+
+(define-macro (macro-node-set n)
+  `(let((v (macro-node-vector ,n))
+	(b (macro-node-bitmap ,n)))
+     (if (bit-set? h0 ,b) 
+	 (macro-node-current ,n)
+	 (macro-node-deeper ,n))))
+
+(define (unsafe-set pm k val)
   (let*((make-hash (macro-persistent-map-hash pm))
 	(eq (macro-persistent-map-eq pm))
 	(lbf (macro-persistent-map-lbf pm))
-	(-lbf (- lbf))
-	(hash (make-hash k))	
-	(bf (arithmetic-shift lbf 1)))
-    
-    (define (path-set depth n)
-      (cond
-       ((vector? n) (node-set depth n))
-       ((pair? n) (leave-set depth n))
-       (else (cons 1 (cons k v)))))
-    
-    (define (node-set depth n)
-      (let ((h0 (extract-bit-field lbf (* depth lbf) hash))
-	    (bitmap (vector-ref n 0)))
-	(if (bit-set? h0 bitmap)
-	    (node-set-deeper depth n bitmap h0)
-	    (node-set-current depth n bitmap h0))))
-
-    (define (node-set-current depth n bitmap h0)
-      (let*((n1 (make-vector (+ 1 (vector-length n))))
-	    (bitmap1 (bit-set h0 bitmap)))
-
-	(vector-set! n1 0 bitmap1)
-	(vector-set! n1 (vector-length n) (cons k v))
+	(hash (make-hash k))
+	(length (macro-persistent-map-length pm))
+	(delta 0)
+	(tree (let tree-set ((depth 0) (n (macro-persistent-map-tree pm)))
+		(let ((h0 (extract-bit-field lbf (* depth lbf) hash)))
+		  (cond
+		   ((macro-node? n)
+		    (let*((v (macro-node-vector n))
+			  (b (macro-node-bitmap n))
+			  (p (bit-count (extract-bit-field h0 0 b))))
+		      (if (bit-set? h0 b)
+			  (macro-make-node 
+			   b
+			   (make-vector&init 
+			    (vector-length v)
+			    (lambda (j) (if (= j p) 
+					    (tree-set (+ 1 depth) (vector-ref v j))
+					    (vector-ref v j)))))
+			  (begin 
+			    (set! delta 1)
+			    (macro-make-node
+			     (macro-bit-set h0 b)
+			     (make-vector&init
+			      (+ 1 (vector-length v))
+			      (lambda (j) (cond
+					   ((< j p) (vector-ref v j))
+					   ((= j p) (list (cons k val)))
+					   ((> j p) (vector-ref v (- j 1)))))))))))
+		   ((pair? n)
+		    (let assoc ((ps n) (rs '()))
+		      (if (null? ps)
+			  (let*((h1 (extract-bit-field lbf (* depth lbf) (make-hash (caar ps))))
+				(n1 (macro-make-node (arithmetic-shift 1 h1) (vector n))))
+			    (tree-set depth n1))
+			  (let*((p (car ps)) (k0 (car p)))
+			    (cond
+			     ((eq k k0) 
+			      (append (cdr ps) (cons (cons k val) rs)))
+			     ((= hash (make-hash k0)) 
+			      (set! delta 1)
+			      (append (cdr ps) (cons (cons k val) (cons p rs))))
+			     (else 
+			      (assoc (cdr ps) (cons p rs))))))))
+		   (else 
+		    (set! delta (+ delta 1))
+		    (list (cons k val))))))))
 	
-	(do ((j 1 (+ j 1))
-	     (j-1 0 j))
-	    ((> j-1 lbf) (cons 1 n1))
-	  (if (bit-set? j-1 bitmap) 
-	      (let((i (bit-count (extract-bit-field j 0 bitmap)))
-		   (i1 (bit-count (extract-bit-field j 0 bitmap1))))
-		(vector-set! n1 i1 (vector-ref n i)))))))
-
-    (define (node-set-deeper depth n bitmap h0)
-      (let*((n1 (vector-copy n))
-	    (p (+ h0 1))
-	    (res (path-set (+ depth 1) (vector-ref n p)))
-	    (delta (car res))
-	    (c (cdr res)))
-	(vector-set! n1 p c)
-	(cons delta n1)))
-	   
-    (define (leave-set depth n)
-      (let((k0 (car n)))
-	(if (eq k0 k) (cons 0 (cons k v))
-	    (let*((hash0 (make-hash k0))
-		  (h0 (extract-bit-field lbf (* depth lbf) hash0)))
-	      (node-set depth (vector (arithmetic-shift 1 h0) n))))))
-
-    ;; main 
-    (path-set 0 (macro-persistent-map-tree pm))))
-
-(define (tree-unset pm k)
-  (let*((make-hash (macro-persistent-map-hash pm))
-	(eq (macro-persistent-map-eq pm))
-	(lbf (macro-persistent-map-lbf pm))
-	(-lbf (- lbf))
-	(hash (make-hash k))	
-	(bf (arithmetic-shift lbf 1)))
-    
-    (define (path-unset depth n)
-      (cond
-       ((vector? n) (node-unset depth n))
-       ((pair? n) (leave-unset depth n))
-       (else (cons 0 n))))
-    
-    (define (node-unset depth n)
-      (let ((h0 (extract-bit-field lbf (* depth lbf) hash))
-	    (bitmap (vector-ref n 0)))
-	(if (bit-set? h0 bitmap)
-	    (node-unset-deeper depth n bitmap h0)
-	    (cons 0 n))))
-    
-    (define (node-unset-deeper pdeth n bitmap h0)
-      (let*((res (path-set (+ depth 1) (vector-ref n p)))
-	    (delta (car res))
-	    (child (cdr res)))
-	(cond
-	 ((= delta 0) n)
-	 ((not child) #f #;" if (only 2 elements, remove that one and return (cons k0 v0)" )
-	 (else #f #;(copy the vector (with 1 less element) and copy data from n except the one @p)))))
-	 
-    ;; main 
-    (path-unset 0 (macro-persistent-map-tree pm))))
-
-(define (tree-ref pm k d)
-  (let*((make-hash (macro-persistent-map-hash pm))
-	(eq (macro-persistent-map-eq pm))
-	(lbf (macro-persistent-map-lbf pm))
-	(-lbf (- lbf))
-	(hash (make-hash k)))
-
-    (define-macro (fail)
-      `(if (eq? d *absent*) 
-	   (key-not-found-error persistent-map-ref (list pm k))
-	   d))
-    
-    (define (path-ref depth n)
-      (cond
-       ((vector? n) (node-ref depth n))
-       ((pair? n) (leave-ref depth n))
-       (else (fail))))
-
-    (define (leave-ref depth n)
-      (if (eq (car n) k) 
-	  (cdr n)
-	  (fail)))
-
-    (define (node-ref depth n)
-      (let((h0 (extract-bit-field lbf (* depth lbf) hash))
-	   (bitmap (vector-ref n 0)))
-	(if (bit-set? h0 bitmap)
-	    (path-ref (+ depth 1) (vector-ref n (+ h0 1)))
-	    (fail))))
-
-    (path-ref 0 (macro-persistent-map-tree pm))))
-
-(define (tree-reduce fn i n)
-  (cond
-   ((vector? n) (node-reduce fn i n))
-   ((pair? n) (fn i n))
-   (else i)))
-
-(define (node-reduce fn i n)
-  (do ((j 1 (+ j 1))
-       (i i (tree-reduce fn i (vector-ref n j))))
-      ((>= j (vector-length n)) i)))
-  
-(define (node-for-each fn n)
-  (do ((j 1 (+ j 1)))
-      ((>= j (vector-length n)))
-    (tree-for-each fn (vector-ref n j))))
-
-(define (tree-for-each fn n)
-  (cond
-   ((vector? n) (node-for-each fn n))
-   ((pair? n) (fn (car n) (cdr n)))))
-
-
-(define (unsafe-set pm k #!optional (v *absent*))
-  (let*((res (if (eq? v *absent*) (tree-unset pm k) (tree-set pm k v)))
-	(delta (car res))
-	(tree (cdr res)))  
     (macro-make-persistent-map
-     (macro-persistent-map-lbf pm)
-     (macro-persistent-map-hash pm)
-     (macro-persistent-map-eq pm)
-     tree
-     (+ delta (macro-persistent-map-length pm)))))
+     lbf
+     make-hash
+     eq
+     (+ length delta)
+     tree)))
+
+(define (unsafe-unset pm k)
+  (let*((make-hash (macro-persistent-map-hash pm))
+	(eq (macro-persistent-map-eq pm))
+	(lbf (macro-persistent-map-lbf pm))
+	(hash (make-hash k))
+	(length (macro-persistent-map-length pm))
+	(delta 0)
+	(tree (let tree-unset ((depth 0) (n (macro-persistent-map-tree pm)))
+		(let ((h0 (extract-bit-field lbf (* depth lbf) hash)))
+		  (cond
+		   ((macro-node? n)
+		    (let*((v (macro-node-vector n))
+			  (b (macro-node-bitmap n))
+			  (p (bit-count (extract-bit-field h0 0 b))))
+		      (if (bit-set? h0 b)
+			  (let ((child (tree-unset (+ depth 1) (vector-ref v p))))
+			    (cond
+			     ((= delta 0) n)
+			     ((null? child)
+			      (if (<= (vector-length v) 2)
+				  (vector-ref v (if (= p 0) 1 0))
+				  (let ((b1 (macro-bit-unset h0 b)))
+				    (macro-make-node 
+				     b1
+				     (make-vector&init 
+				      (- (vector-length v) 1)
+				      (lambda (j) 
+					(cond
+					 ((< j p) (vector-ref v j))
+					 ((>= j p) (vector-ref v (+ j 1))))))))))
+			     (else 
+			      (macro-make-node
+			       b
+			       (make-vector&init 
+				(vector-length v)
+				(lambda (j) 
+				  (cond
+				   ((< j p) (vector-ref v j))
+				   ((= j p) child)
+				   ((> j p) (vector-ref v j))))))))))))
+		   ((pair? n)
+		    (let dissoc ((ps n) (rs '()))
+		      (if (null? ps) n
+			  (let*((p (car ps)) (k0 (car p)))
+			    (if (eq k k0) 
+				(begin (set! delta -1) (append (cdr ps) rs))
+				(dissoc (cdr ps) (cons p rs)))))))
+		   (else n))))))
+    (macro-make-persistent-map
+     lbf
+     make-hash
+     eq
+     (+ length delta)
+     tree)))
+
+(define (unsafe-ref pm k default)
+  (let*((make-hash (macro-persistent-map-hash pm))
+	(eq (macro-persistent-map-eq pm))
+	(lbf (macro-persistent-map-lbf pm))
+	(hash (make-hash k))
+	(length (macro-persistent-map-length pm)))
+    (let ref ((depth 0) 
+	      (n (macro-persistent-map-tree pm)))
+      (let ((h0 (extract-bit-field lbf (* depth lbf) hash)))
+	(cond
+	 ((macro-node? n)
+	  (let*((v (macro-node-vector n))
+		(b (macro-node-bitmap n))
+		(p (bit-count (extract-bit-field h0 0 b))))
+	    (cond 
+	     ((bit-set? h0 b) 
+	      (ref (+ depth 1) (vector-ref v p)))
+	     ((eq? default *absent*) 
+	      (key-not-found-error persistent-map-ref (list pm k)))
+	     (else default))))
+	 ((pair? n)
+	  (let ref ((ps n))
+	    (cond
+	     ((pair? ps) (if (eq (caar ps) k) (cdar ps) (ref (cdr ps))))
+	     ((eq? default *absent*)
+	      (key-not-found-error persistent-map-ref (list pm k)))
+	     (else default))))
+	 ((eq? default *absent*)
+	  (key-not-found-error persistent-map-ref (list pm k)))
+	 (else default))))))
   
-(define (unsafe-ref pm k d)
-  (tree-ref pm k d))
-
-(define (unsafe-for-each fn pm)
-   (tree-for-each fn (macro-persistent-map-tree pm)))
-
-;; (define (unsafe->list pm)
-;;   (tree->list (macro-persistent-map-tree pm)))
-
-(define (snoc a b) (cons b a))
-
 (define (unsafe-reduce fn i pm)
-  (tree-reduce fn i (macro-persistent-map-tree pm)))
-  
+  (let tree-reduce ((i i) (n (macro-persistent-map-tree pm)))
+    (cond
+     ((macro-node? n) 
+      (let ((v (macro-node-vector n)))
+	(do ((j 0 (+ j 1))
+	     (i i (tree-reduce i (vector-ref v j))))
+	    ((>= j (vector-length v)) i))))
+     ((pair? n)
+      (do ((ps n (cdr ps))
+	   (i i (fn i (car ps))))
+	  ((null? ps) i)))
+     (else i))))
+
+(define (unsafe-list->persistent-map ps eq hash lbf)
+  (let list-> ((ps ps) 
+	       (pm (macro-make-persistent-map lbf hash eq 0 #f)))
+    (cond
+     ((and (pair? ps) (pair? (car ps)))
+      (list-> (cdr ps) (unsafe-set pm (caar ps) (cdar ps))))
+     ((null? ps) pm)
+     (else (type-error list->persistent-map (list ps) 0)))))
+
+(define (unsafe-merge-slow p q)
+  (unsafe-reduce (lambda (p1 e) (unsafe-set p1 (car e) (cdr e))) p q))
+
+(define (unsafe-merge-fast p q)
+  (error "fast merging not implemented, yet"))
+
+
 (define (make-persistent-map #!key (eq eq?) (hash eq?-hash) (lbf 5))
-  (macro-make-persistent-map lbf hash eq #f 0))
+  (cond
+   ((not (procedure? eq)) (type-error make-persistent-map (list eq: eq) 2))
+   ((not (procedure? hash)) (type-error make-persistent-map (list hash: hash) 2))
+   ((not (integer? lbf)) (type-error make-persistent-map (list lbf: lbf) 2))
+   (else (macro-make-persistent-map lbf hash eq 0 #f))))
 
 (define (persistent-map? pm)
   (macro-persistent-map? pm))
@@ -232,59 +269,88 @@
    ((macro-persistent-map? pm) (macro-persistent-map-length pm))
    (else (type-error persistent-map-length (list pm) 0))))
 
-;; TODO make v optional, if not present remove k from map
-(define (persistent-map-set pm k v)
+(define (persistent-map-set pm k #!optional (v *absent*))
   (cond
-   ((macro-persistent-map? pm) (unsafe-set pm k v))
+   ((macro-persistent-map? pm) (if (eq? v *absent*) (unsafe-unset pm k) (unsafe-set pm k v)))
+   ((eq? v *absent*) (type-error persistent-map-set (list pm k) 0))
    (else (type-error persistent-map-set (list pm k v) 0))))
 
 (define (persistent-map-ref pm k #!optional (default *absent*))
   (cond
    ((macro-persistent-map? pm) (unsafe-ref pm k default))
-   ((eq? default *absent*) (type-error persistent-map-ref (list pm k) 0))
-   (else (type-error persistent-map-ref (list pm k v) 0))))
+   ((eq? v *absent*) (type-error persistent-map-set (list pm k) 0))
+   (else (type-error persistent-map-set (list pm k default) 0))))
 
-(define (persistent-map-for-each fn pm)
-  (cond
-   ((macro-persistent-map? pm) (unsafe-for-each fn pm))
-   (else (type-error persistent-map-set (list pm k v) 0))))
-  
 (define (persistent-map-reduce fn i pm)
   (cond
    ((macro-persistent-map? pm) (unsafe-reduce fn i pm))
    (else (type-error persistent-map-reduce (list fn i pm) 2))))
-  
+
+(define (persistent-map-for-each fn pm)
+  (cond
+   ((macro-persistent-map? pm) (unsafe-reduce (lambda (i p) (fn (car p) (cdr p)) i) #f pm))
+   (else (type-error persistent-map-for-each (list fn pm) 1))))
+
 (define (persistent-map->list pm)
   (cond
-   ((macro-persistent-map? pm) (unsafe-reduce snoc '() pm))
-   (else (type-error persistent-map->list (list pm) 0))))
-	 
-(define (list->persistent-map ps)
+   ((macro-persistent-map? pm) (unsafe-reduce (lambda (i p) (cons p i)) '() pm))
+   (else (type-error persistent-map->list  (list pm) 0))))
+
+(define (persistent-map-keys pm)
   (cond
-   ((list? ps) (unsafe-list->map ps))
-   (else (type-error persistent-map->list (list ps) 0))))
+   ((macro-persistent-map? pm) (unsafe-reduce (lambda (i p) (cons (car p) i)) '() pm))
+   (else (type-error persistent-map-keys (list pm) 0))))
 
-(define persistent-map-merge)
-   
-(define pm (make-persistent-map lbf: 2))
+(define (persistent-map-values pm)
+  (cond
+   ((macro-persistent-map? pm) (unsafe-reduce (lambda (i p) (cons (cdr p) i)) '() pm))
+   (else (type-error persistent-map-values (list pm) 0))))
 
-(define pm1 (persistent-map-set pm 0 'zero))
+(define (persistent-map-merge p q)
+  (cond
+   ((not (macro-persistent-map? p)) (type-errro persistent-map-lerge (list p q) 0))
+   ((not (macro-persistent-map? q)) (type-errro persistent-map-lerge (list p q) 1))
+   ((and (eq? (macro-persistent-map-lbf p) (macro-persistent-map-lbf q))
+	 (eq? (macro-persistent-map-eq p) (macro-persistent-map-eq q))
+	 (eq? (macro-persistent-map-hash p) (macro-persistent-map-hash q)))
+    (unsafe-merge-fast p q))
+   (else (unsafe-merge-slow p q))))
 
-(define pm2 (persistent-map-set pm1 1 'uno))
+(define (list->persistent-map ps #!key (eq eq?) (hash eq?-hash) (lbf 5))
+  (cond
+   ((not (procedure? eq)) (type-error make-persistent-map (list eq: eq) 2))
+   ((not (procedure? hash)) (type-error make-persistent-map (list hash: hash) 2))
+   ((not (integer? lbf)) (type-error make-persistent-map (list lbf: lbf) 2))
+   (else (unsafe-list->persistent-map ps eq hash lbf))))
 
-(define pm3 (persistent-map-set pm2 2 'due))
 
-(define pm4 (persistent-map-set pm3 3 'tre))
+(define pm)
 
-(define pm5 (persistent-map-set pm4 4 'quattro))
+(set! pm (make-persistent-map lbf: 2))
+(set! pm (persistent-map-set pm 0 'zero))
+(set! pm (persistent-map-set pm 1 'uno))
+(set! pm (persistent-map-set pm 'a "a"))
+(set! pm (persistent-map-set pm a: "a k"))
+(set! pm (persistent-map-set pm b: "b keyword"))
+(set! pm (persistent-map-set pm c: "c keyword"))
+(set! pm (persistent-map-set pm d: "d keyword"))
 
-(define pm6 (persistent-map-set pm5 k: 'duecento))
+;; (pp (persistent-map-reduce (lambda (a b) (cons b a)) '() pm))
+;; (persistent-map-for-each (lambda (key val) (pp `(key: ,key val: ,val))) pm)
 
-(pp pm6)
-(pp (time (persistent-map-ref pm6 1)))
+(pp (persistent-map->list pm))
+(set! pm (persistent-map-set pm 0))
+(pp (persistent-map->list pm))
 
-;; (persistent-map-for-each (lambda (key value) (pp (list key: key value: value))) pm6)
+;; (pp (persistent-map-ref pm a:))
+;; (pp (persistent-map-ref pm 0 'missed))
+ 
+ ;; (define pm3 (persistent-map-set pm2 2 'due))
 
-(define (flip fn) (lambda (a b) (fn b a)))
+;; (define pm4 (persistent-map-set pm3 3 'tre))
 
-;; (pp (persistent-map->list pm6))
+;; (define pm5 (persistent-map-set pm4 4 'quattro))
+
+;; (define pm6 (persistent-map-set pm5 k: 'duecento))
+
+;; (define pm7 (persistent-map-set pm6 1))
