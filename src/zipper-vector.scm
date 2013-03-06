@@ -252,6 +252,7 @@
 
 ;; creation
 (define (make-persistent-vector size #!key (lbf 3) (init 0))
+  (if (not (procedure? init)) (let ((i0 init))  (set! init (lambda (_) i0))))
   (cond
    ((not (integer? size)) (type-error make-persistent-vector (list size lbf init) 0))
    ((< size 0) (range-error make-persistent-vector (list size lbf init) 0))

@@ -1,6 +1,5 @@
 ;; this is the standard, without focus or last optimizations, just plain persistent map in log(n) / log (lbf) access time
 
-;; TODO change ids
 (##namespace ("persistent.map#"))
 (##include "~~/lib/gambit#.scm")
 
@@ -28,6 +27,14 @@
   id: ad201dc5-8cb1-4127-978b-f64b8bfbd10a
   (arguments read-only: unprintable:)
   (arg-num read-only: unprintable:))
+
+(define 
+  persistent-map-type-exception-procedure
+  persistent-map-exception-procedure)
+
+(define 
+  persistent-map-key-not-found-exception-procedure
+  persistent-map-exception-procedure)
 
 (define-macro (key-not-found-error p a)
   `(raise (make-persistent-map-key-not-found-exception ,p ,a)))
@@ -73,12 +80,12 @@
 (define-macro (macro-bit-unset j n)
   `(clear-bit-field 1 ,j ,n))
 
-(define-macro (macro-node-set n)
-  `(let((v (macro-node-vector ,n))
-	(b (macro-node-bitmap ,n)))
-     (if (bit-set? h0 ,b) 
-	 (macro-node-current ,n)
-	 (macro-node-deeper ,n))))
+;; (define-macro (macro-node-set n)
+;;   `(let((v (macro-node-vector ,n))
+;; 	(b (macro-node-bitmap ,n)))
+;;      (if (bit-set? h0 ,b) 
+;; 	 (macro-node-current ,n)
+;; 	 (macro-node-deeper ,n))))
 
 (define (unsafe-set pm k val)
   (let*((make-hash (macro-persistent-map-hash pm))
@@ -277,7 +284,7 @@
 (define (persistent-map-ref pm k #!optional (default *absent*))
   (cond
    ((macro-persistent-map? pm) (unsafe-ref pm k default))
-   ((eq? v *absent*) (type-error persistent-map-set (list pm k) 0))
+   ((eq? default *absent*) (type-error persistent-map-set (list pm k) 0))
    (else (type-error persistent-map-set (list pm k default) 0))))
 
 (define (persistent-map-reduce fn i pm)
@@ -307,8 +314,8 @@
 
 (define (persistent-map-merge p q)
   (cond
-   ((not (macro-persistent-map? p)) (type-errro persistent-map-lerge (list p q) 0))
-   ((not (macro-persistent-map? q)) (type-errro persistent-map-lerge (list p q) 1))
+   ((not (macro-persistent-map? p)) (type-error persistent-map-merge (list p q) 0))
+   ((not (macro-persistent-map? q)) (type-error persistent-map-merge (list p q) 1))
    ((and (eq? (macro-persistent-map-lbf p) (macro-persistent-map-lbf q))
 	 (eq? (macro-persistent-map-eq p) (macro-persistent-map-eq q))
 	 (eq? (macro-persistent-map-hash p) (macro-persistent-map-hash q)))

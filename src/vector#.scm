@@ -1,5 +1,21 @@
 (##namespace 
  ("persistent.vector#"
+  ;; exceptions
+  persistent-vector-exception?
+  persistent-vector-exception-procedure
+  persistent-vector-exception-arguments
+  persistent-vector-exception-arg-num
+
+  persistent-vector-range-exception?
+  persistent-vector-range-exception-procedure
+  persistent-vector-range-exception-arguments
+  persistent-vector-range-exception-arg-num
+
+  persistent-vector-type-exception?
+  persistent-vector-type-exception-procedure
+  persistent-vector-type-exception-arguments
+  persistent-vector-type-exception-arg-num
+
   ;; creators
   persistent-vector
   make-persistent-vector

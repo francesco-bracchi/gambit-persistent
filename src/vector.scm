@@ -4,6 +4,7 @@
 (##include "~~/lib/gambit#.scm")
 
 (##namespace ("persistent.vector#" length))
+
 (declare (standard-bindings)
 	 (extended-bindings)
 	 (block)
@@ -28,6 +29,26 @@
 (define-persistent-vector-exception persistent-vector-type-exception
   id: 6f03074f-f8f1-4cf8-81e6-619a788bcf2b)
 
+(define 
+  persistent-vector-range-exception-procedure
+  persistent-vector-exception-procedure)
+(define
+   persistent-vector-range-exception-arguments
+   persistent-vector-exception-arguments)
+(define
+  persistent-vector-range-exception-arg-num
+  persistent-vector-exception-arg-num)
+
+(define 
+  persistent-vector-type-exception-procedure
+  persistent-vector-exception-procedure)
+(define
+   persistent-vector-type-exception-arguments
+   persistent-vector-exception-arguments)
+(define
+  persistent-vector-type-exception-arg-num
+  persistent-vector-exception-arg-num)
+
 (define (range-error p a n)
   (raise (make-persistent-vector-range-exception p a n)))
 
@@ -47,7 +68,6 @@
   
   (depth read-only: unprintable:)
   (bf read-only: unprintable:))
-
 
 (define-macro (macro-calc-persistent-vector-bf pv) `(arithmetic-shift 1 (macro-persistent-vector-lbf ,pv)))
 
@@ -120,7 +140,7 @@
 				    (+ offset (* j s0))))))))))
 
 (define (unsafe-ref pv j)
-  (vector-ref (vector-for pv j) (bitwise-and j (- (macro-persistent-vector-bf ,pv) 1))))
+  (vector-ref (vector-for pv j) (bitwise-and j (- (macro-persistent-vector-bf pv) 1))))
 
 (define (vector-set t j v)
   (let((copy (vector-copy t)))
@@ -265,6 +285,7 @@
   
 ;; creation
 (define (make-persistent-vector size #!key (lbf 5) (init 0))
+  (if (not (procedure? init)) (let ((i0 init)) (set! init (lambda (_) i0))))
   (cond
    ((not (integer? size)) (type-error make-persistent-vector (list size lbf init) 0))
    ((< size 0) (range-error make-persistent-vector (list size lbf init) 0))
@@ -286,7 +307,7 @@
    ((not (macro-persistent-vector? pv)) (type-error persistent-vector-ref (list pv j) 0))
    ((not (integer? j)) (type-error persistent-vector-ref (list pv j) 1))
    ((< j 0) (range-error persistent-vector-ref (list pv j) 1))
-   ((>= j (length pv)) (range-error persistent-vector-ref (list pv j) 1))
+   ((>= j (macro-persistent-vector-length pv)) (range-error persistent-vector-ref (list pv j) 1))
    (else (unsafe-ref pv j))))
 
 ;; set
