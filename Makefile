@@ -69,6 +69,7 @@ $(INSTALLDIR):
 install: builddir $(INSTALLDIR)
 	-@echo "installing '${LIBNAME}' in:"
 	-@echo $(INSTALLDIR)
+	$(INSTALL) -r $(BUILDDIR)/* $(INSTALLDIR)
 
 test: builddir
 	$(GSI) -:~~$(LIBNAME)=$(BUILDDIR) ~~$(LIBNAME)/$(LIBNAME) $(TEST_FILES)
